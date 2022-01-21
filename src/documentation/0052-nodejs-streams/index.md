@@ -106,10 +106,10 @@ Due to their advantages, many Node.js core modules provide native stream handlin
 
 There are four classes of streams:
 
-* `Readable`: a stream you can pipe from, but not pipe into (you can receive data, but not send data to it). When you push data into a readable stream, it is buffered, until a consumer starts to read the data.
-* `Writable`: a stream you can pipe into, but not pipe from (you can send data, but not receive from it)
-* `Duplex`: a stream you can both pipe into and pipe from, basically a combination of a Readable and Writable stream
-* `Transform`: a Transform stream is similar to a Duplex, but the output is a transform of its input
+* `Readable`: a stream which could be used for read data from it. In other words, its `readonly`.
+* `Writable`: a stream which could be used for write data to it. It is `writeonly`. 
+* `Duplex`: a stream which can read and write data, basically its a combination of a `Readable` and `Writable` stream.
+* `Transform`: a `Duplex` stream which reads data, transforms the data, and then writes the transformed data in the desired format.
 
 ## How to create a readable stream
 
@@ -231,8 +231,15 @@ readableStream.pipe(writableStream)
 readableStream.push('hi!')
 readableStream.push('ho!')
 
-writableStream.end()
+readableStream.on('close', () => writableStream.end())
+writableStream.on('close', () => console.log('ended'))
+
+readableStream.destroy()
 ```
+
+In the above example, `end()` is called within a listener to the `close` event on the readable stream to ensure it is not called before all write events have passed through the pipe, as doing so would cause an `error` event to be emitted.
+Calling `destroy()` on the readable stream causes the `close` event to be emitted.
+The listener to the `close` event on the writable stream demonstrates the completion of the process as it is emitted after the call to `end()`.
 
 ## How to create a transform stream
 
@@ -242,14 +249,14 @@ First create a transform stream object:
 
 ```js
 const { Transform } = require('stream')
-const TransformStream = new Transform();
+const transformStream = new Transform();
 ```
 
 then implement `_transform`:
 
 ```js
-TransformStream._transform = (chunk, encoding, callback) => {
-  console.log(chunk.toString().toUpperCase());
+transformStream._transform = (chunk, encoding, callback) => {
+  transformStream.push(chunk.toString().toUpperCase());
   callback();
 }
 ```
@@ -257,5 +264,5 @@ TransformStream._transform = (chunk, encoding, callback) => {
 Pipe readable stream:
 
 ```js
-process.stdin.pipe(TransformStream);
+process.stdin.pipe(transformStream).pipe(process.stdout);
 ```
